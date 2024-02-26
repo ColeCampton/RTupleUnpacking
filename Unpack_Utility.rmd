@@ -1,0 +1,114 @@
+---
+title: "Tuple/List Unpacking Utility"
+author: "Cole Campton"
+output: 
+  html_document: 
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    code_folding: hide
+    fig_width: 12 
+    fig_height: 8 
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+```
+
+# Introduction
+
+The unpacking function provides the widely loved utility of tuple unpacking from langauges like Python. 
+When a function returns a tuple/list of outputs, tuple unpacking is the act of assigning that list to a list of variables simulataneously. 
+The benefit of this syntax is that since `R` allows only as single returned variable, tuple unpacking allows multiple returned variables without having to manually assign them retroactively. 
+
+## Function definition
+
+```{r function_definition}
+`%=%` <- function(x,value,pos = -1, envir = parent.frame(), inherits = FALSE, immediate=TRUE){
+    # Cole Campton 2023
+    # The glorious unpacking function that R is missing!
+    # Usage:
+    # c(a,b,c) %=% c(1,2,3) #Unpacking!
+    # testFunc <- function(x){
+    #   return(c(x,2*x,3*x))
+    # }
+    # c(a,b,c) %=% testFunc(1) # best for unpacking function outputs!
+    # c(a,b,c) %=% list("d"=1, "e" = 3, "f" = 4) #works for named lists as well
+    # list(a,b,c) %=% list(1,2,3) # works with lists for assignment side as well
+    # a %=% c(1,2,3) # same behavior as a = c(1,2,3)
+    # c(a,b) %=% c(1,2,3) #error, wrong length
+
+    x <- substitute(x())
+    if(class(x[[1]]) == "call"){
+      x = sapply(x[[1]][-1],deparse)
+      # If there are substrings of lists map: c(...)-> ... in practice concatenating sub-vectors
+      x = unlist(lapply(x,function(y) strsplit(sub("c\\((.*)\\)", "\\1", y),',')))
+    }else{
+      x=sapply(x,deparse)
+    }
+    if(length(x)==length(value)){
+      #Assign each pair
+      mapply(function(X,Y) base::assign(X,Y,envir=envir, inherits = inherits, immediate=immediate), x, value)
+    }else if(length(x)==1){
+      #If only one assign value to x
+      base::assign(x,value,envir=envir, inherits = inherits, immediate=immediate)
+    }else{
+      stop("Source and assignment lists of different length.")
+    }  
+}
+```
+
+# Example Usage
+## Example Data
+```{r random_data}
+testFunc <- function(x){
+    return(c(x,2*x,3*x))
+}
+```
+
+## Un-Example
+
+The following is an example of the circumstance when this function is useful. When the outputs are needed as separate variables in the namespace, without the unpacking function the returned list must be indexed and assigned to variables independently. 
+
+```{r unexample,echo=T, class.source = 'fold-show'}
+list_output <-testFunc(1) 
+a = list_output[1]
+b = list_output[2]
+c = list_output[3]
+```
+
+## Example 
+
+Rather than assigning variables manually, the unpacking function allows us to use the following convenient notation. The binary syntax of `%=%` also intuitively mirrors that of mapping assignment. Note that the left hand side variables are treated as unparsed variable names. 
+
+```{r example_usage, echo=T,class.source = 'fold-show'}
+c(a,b,c) %=% c(1,2,3) #Unpacking!
+c(a,b,c) %=% testFunc(1) # best for unpacking function outputs!
+c(a,b,c) %=% list("d"=1, "e" = 3, "f" = 4) #works for named lists as well
+list(a,b,c) %=% list(1,2,3) # works with lists for assignment side as well
+a %=% c(1,2,3) # same behavior as a = c(1,2,3)
+```
+
+The one restriction will be that when the left hand side is not a singleton the length must equal the number of outputs of the right hand side.
+
+```{r example_error, echo=T,class.source = 'fold-show'}
+tryCatch(
+        expr = {
+            c(a,b) %=% c(1,2,3) #error, wrong length
+        },
+        error = function(e){
+            print('Caught an error!')
+            print(e)
+        }
+    )
+```
+
+# R session info
+
+```{r session_info, class.source = 'fold-hide'}
+sessionInfo()
+```
+
